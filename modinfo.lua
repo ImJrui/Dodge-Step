@@ -10,10 +10,10 @@ end
 
 name = en_zh({ en = "Dodge Step", zh = "闪身步" })
 description = en_zh({
-    en = "Automatically dodge Shrouden using Soul Hop or a Lazy Explorer. Client only.",
-    zh = "使用灵魂跳跃或懒人手杖自动闪避 Shrouden 的危险技能，仅客户端运行。",
+    en = "Client-only automatic dodging for Shrouden.\n\nPortal summons: if you are in front of the boss within about 14 units, blink behind it.\nOptic blast: when the boss teleports near you to fire its laser, blink away.\nIchor pursuit: when the boss turns into a puddle and closes in, blink away to keep your distance.\n\nWortox uses Soul Hop first; otherwise, use a Lazy Explorer or an orange-gem King's Staff. Avoids dangerous landing spots and restores your previous weapon after dodging.",
+    zh = "仅客户端，自动闪避暗影憎恶（Shrouden）的危险技能。\n\n传送门召唤：当你位于 Boss 前方约14距离内时，闪现到 Boss 身后。\n镭射激光：当 Boss 传送到你附近释放激光时，闪现远离 Boss。\n恶液追击：当 Boss 化身恶液并追到你附近时，闪现拉开距离。\n\n沃拓克优先使用灵魂跳跃，其他情况使用懒人手杖或镶嵌橙宝石的国王权杖。自动避开危险落点，闪避后恢复原武器。",
 })
-author = ""
+author = "TUTU"
 version = "0.2.0"
 api_version = 10
 dst_compatible = true
