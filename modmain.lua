@@ -1,0 +1,6 @@
+modimport("main/constants.lua")
+modimport("main/toolutil.lua")
+modimport("main/strings.lua")
+modimport("main/popups.lua")
+modimport("main/postinit.lua")
+modimport("main/keybinds.lua")
