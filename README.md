@@ -1,96 +1,78 @@
 # 闪身步 / Dodge Step
 
-《饥荒联机版》仅客户端 Mod 的初始化工程，运行环境为 Lua 5.1。
+《饥荒联机版》仅客户端 Mod，Lua 5.1。启用后自动为当前玩家管理 Shrouden 闪避方案；其他玩家无需安装，服务器无需安装。
 
-当前只提供工程结构、公共配置与日志工具、双语元信息和运行时字符串；尚未实现闪避、按键操作、界面或其他玩法功能。启用后不会注册 Hook、绑定快捷键或启动任务。
+## Shrouden 自动闪避
 
-## 目录与加载顺序
+Boss 生成或进入当前客户端加载范围时，自动启用玩家的 `ds_shrouden` 组件；休眠、移除或离开加载范围时自动停用。玩家重新激活后会重新连接已加载的 Boss，多个 Boss 分别登记。
 
-```text
-Dodge-Step/
-├── AGENTS.md
-├── modinfo.lua
-├── modmain.lua
-├── main/
-│   ├── constants.lua
-│   ├── toolutil.lua
-│   ├── strings.lua
-│   ├── popups.lua
-│   ├── postinit.lua
-│   └── keybinds.lua
-├── postinit/
-│   ├── components/
-│   ├── prefabs/
-│   ├── screens/
-│   └── widgets/
-├── scripts/
-│   ├── components/
-│   ├── screens/
-│   ├── widgets/
-│   └── languages/
-│       ├── strings.pot
-│       └── ds_chinese_s.po
-├── strings/
-│   └── common.lua
-├── anim/
-├── images/
-├── tests/
-├── tools/
-└── docs/
-```
+| 技能 | 触发条件 | 落点优先级 |
+| --- | --- | --- |
+| 传送门召唤攻击 | punch_pre / punch_loop，玩家在前方 120°、距离 ≤12 | 后方 120°、4<半径≤8，先选离 Boss 更近的位置；无合适点时使用备用区域 |
+| 眼睛镭射 | optic_blast_pre2 / loop / pre3，Boss 已传到目标附近，平面距离 ≤6 | 备用区域 |
+| 恶液追击 | teleport_loop，平面距离 ≤4 | 备用区域 |
 
-modmain.lua 按 constants → toolutil → strings → popups → postinit → keybinds 的顺序导入，入口本身只负责导入。
+全部距离忽略高度。备用区域以 **Shrouden 为圆心、半径 20**，先选离 Boss 更远的位置；同时要求玩家到落点不超过 36，至少移动 3，并离开当前技能危险区域。
 
-- main/：初始化与公共基础设施。
-- postinit/：原版或兼容 Mod 的 Hook，按目标对象分类。新文件必须显式接入 main/postinit.lua。
-- scripts/：自定义组件、Screen、Widget 及其他 require 模块。
-- anim/、images/、tests/、tools/：预留目录，通过 .gitkeep 保留。
-- docs/：已确认的设计与实施记录。
+落点与四种 shadowthrall_wings、shadowthrall_hands、shadowthrall_horns、shadowthrall_mouth 至少相距 **4**，与 charliearena_spike 至少相距 **1.2**。还会排除不可通行地形、地洞、传送禁区和玩家碰撞障碍。普通地面杂物不当作实体目标，避免点到杂物后改变动作。
 
-当前不包含图标、动画、界面或资源清单，不引用不存在的资源。modinfo.lua 的作者字段暂为空，发布前填写。
+搜索采用有界极坐标采样：背后半径步长 0.25，备用区域半径步长 0.5，采样弧长间隔不超过 0.75。它不会穷举连续空间；没有采到安全位置时跳过本次传送。
 
-## 命名与公共工具
+## 闪现方式与物品安全
 
-需要标识本 Mod 归属时，文件、模块和资源使用 ds_，公共函数、变量及配置键使用 DS_。引擎要求的入口和字段保持原名。
+1. 玩家拥有 soulstealer 标签、携带灵魂并满足原版跳跃条件时，优先灵魂跳跃；已装备橙杖也不会抢占角色跳跃动作。
+2. 其余情况查找鼠标、主物品栏、背包及装备栏中的 orangestaff，或 _gem 为 orangegem 且具有客户端 reticule 的 king_cane。冷却中的 nomagiccast 物品不使用。
+3. 先将鼠标原物品存入明确的可用空槽，等待同步；再将法杖拿到鼠标，重检技能、落点与物品，执行原版 BLINK。库存及背包的预测忙碌期间暂停后续操作，不将预测变化当作同步完成。
+4. 适配施法自动装备。传送后尽量归还法杖原槽或原装备位置、恢复先前手持物；归还最多重试两秒，用户更换鼠标物品时停止恢复。
 
-main/ 模块和后续 postinit/ Hook 统一先保存模组环境，再切换到游戏全局环境：
+背包满、没有资源、玩家忙碌或输入界面阻止操作、地形没有安全落点时不会强行传送。使用法杖若会使原装备因缺少空间而掉落，也会放弃。未确认实际位移的请求按超时处理，再按间隔重新判断。
+
+组件不修改服务端状态，不提供无消耗瞬移，也不会绕过原版动作限制；能否完成仍取决于服务器验证、动画和网络同步。
+
+## 目录与开发约定
+
+- modmain.lua：仅按顺序导入 main/ 模块。
+- main/constants.lua：DS_CONFIG、DS_LOG_LEVEL、DS_DODGE、DS_SHROUDEN、DS_BOSS_REGISTRY。
+- main/toolutil.lua：DS_Log、DS_GetString、Boss 登记、法杖/空槽查询、落点环境验证。
+- main/postinit.lua：显式导入 postinit/prefabs/player.lua 和 shrouden.lua。
+- scripts/components/ds_bosswatcher.lua：只在 ThePlayer 上运行，0.25 秒核对登记表。
+- scripts/components/ds_shrouden.lua：方案提供 Enable / Disable，危险技能检查间隔约两帧。
+- scripts/ds_shroudenplan.lua：动画、扇区与落点排序；不提交动作。
+- scripts/ds_blink.lua：异步传送事务、原版动作/RPC、位移确认与清理。
+- strings/、scripts/languages/：英文原文、POT 和中文 PO。
+- tests/：Lua 5.1 离线回归；docs/：设计、实施记录。
+- scripts/screens/、scripts/widgets/、anim/、images/、tools/：预留目录。
+
+main/ 和 postinit/ 统一使用用户约定的环境开头：
 
 ```lua
 local PLENV = env
 GLOBAL.setfenv(1, GLOBAL)
 ```
 
-DS_ 公共变量和函数定义在 GLOBAL 中，require 模块可直接使用。模组专用接口通过 PLENV 访问，例如 PLENV.GetModConfigData、PLENV.modimport、PLENV.MODROOT 和 PLENV.LoadPOFile。modmain.lua 保持仅导入，modinfo.lua 和纯数据字符串文件使用各自的加载环境。
+DS_ 公共定义写入 GLOBAL，模组专用 API 通过 PLENV 访问。未来 Boss 组件使用 ds_bossprefab，Hook 放在 postinit/ 对应目录并显式接入。完整规范见 AGENTS.md。
 
-```lua
-DS_Log("INFO", "State changed")
-local display_name = DS_GetString("NAME")
+## 语言与日志
+
+中文名称为“闪身步”，英文为 Dodge Step。元信息通过 modinfo.lua 的 en_zh 提供双语，运行时文案使用 STRINGS.DS_MOD / DS_GetString；新增文案同步维护 strings/common.lua、strings.pot 和 ds_chinese_s.po。
+
+日志配置 DS_DEBUG_MODE 默认 INFO（3），支持 TRACE、DEBUG、INFO、WARN、ERROR、FATAL。DEBUG 可查看缺少资源、库存不足、无落点或请求超时等失败原因；正常日志仅记录启停及确认成功。
+
+## 离线验证与游戏内验证
+
+在工程根目录使用实际 Lua 5.1 运行：
+
+```text
+lua51 tests/ds_shroudenplan_spec.lua
+lua51 tests/ds_blink_spec.lua
+lua51 tests/ds_lifecycle_spec.lua
+lua51 tests/ds_loading_spec.lua
 ```
 
-DS_CONFIG.DEBUG_MODE 读取配置键 DS_DEBUG_MODE，默认为 INFO（3）。TRACE、DEBUG、INFO、WARN、ERROR、FATAL 对应 1 至 6，仅输出达到阈值的日志。
+将 lua51 替换为实际解释器；默认 lua/luac 可能是 Lua 5.4，不能代替 Lua 5.1 检查。测试使用游戏 Class、原版控制器动作函数和翻译器，默认游戏脚本路径沿用 AGENTS.md；其他安装位置可设置 DS_GAME_SCRIPTS 环境变量。
 
-## 中英文
+也可使用 Python 的 lupa.lua51.LuaRuntime 加载测试。测试模拟网络、库存同步和角色实体，不能代替实际客户端运行。
 
-Mod 名称、说明和日志配置通过 modinfo.lua 的 en_zh 机制提供双语文案。运行时文案存放在 STRINGS.DS_MOD，由 DS_GetString("NAME") 等调用读取；支持点分隔键和 string.format 参数。
+游戏内仍需验证：三种技能的识别和反应时机、普通远程客户端的移动预测开关、灵魂与两种法杖、满包及地面杂物、多 Boss／离开再进入范围、幽灵与重连、中英文 Mod 菜单显示。作者字段尚为空，发布前填写。
 
-新增或修改运行时文案时，同步更新：
-
-1. strings/common.lua 中的英文键和值；
-2. scripts/languages/strings.pot 中的完整 STRINGS.DS_MOD.* 上下文及英文原文；
-3. scripts/languages/ds_chinese_s.po 中对应的上下文、英文原文和中文译文。
-
-中文游戏语言及其常见别名使用简体中文译文，其他语言回退英文。语言加载只修改本 Mod 的字符串表，并恢复翻译器默认语言和临时表。
-
-## 后续扩展
-
-添加原版 Hook 时，将文件放入对应 postinit/ 分类，再在 main/postinit.lua 显式导入。自定义组件、界面及控件主体放在 scripts/ 对应目录；公共工具及常量分别由 main/toolutil.lua、main/constants.lua 管理。
-
-完整开发与 Git 规范见 AGENTS.md。所有改动保持 Lua 5.1 兼容，禁止修改游戏源码。
-
-## 验证说明
-
-Lua 语法检查必须使用 Lua 5.1 解释器或编译器；本机默认 lua/luac 的版本需要先核对。离线加载检查应覆盖英文、中文、未知语言回退、PO/POT 同步、日志过滤、DS_ 公共全局导出和无关全局保护。
-
-离线检查不等同于游戏内验证。还需在游戏 Mod 菜单及独立客户端检查中英文显示和启用后的正常加载。
-
-2026-11-06 初始化验证：9 个 Lua 文件通过实际 Lua 5.1 语法检查；27 组离线加载场景及 2 个运行时字符串键的 Lua/POT/PO 一致性检查通过。离线语言接入检查使用游戏 translator.lua，覆盖语言回退、日志过滤和命名空间隔离。游戏客户端加载及界面显示尚未验证。详细记录见 docs/superpowers/plans/2026-11-06-client-scaffold.md。
+2026-11-06 离线验证：20 个 Lua 文件通过 Lua 5.1 语法检查，47 组回归通过，双语资源一致性及 git diff --check 通过。普通远程客户端实战和游戏内 UI 尚未验证。

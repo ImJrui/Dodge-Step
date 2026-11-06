@@ -10,11 +10,11 @@ end
 
 name = en_zh({ en = "Dodge Step", zh = "闪身步" })
 description = en_zh({
-    en = "Client-only mod scaffold. No gameplay features are enabled.",
-    zh = "仅客户端模组骨架，尚未启用任何玩法功能。",
+    en = "Automatically dodge Shrouden using Soul Hop or a Lazy Explorer. Client only.",
+    zh = "使用灵魂跳跃或懒人手杖自动闪避 Shrouden 的危险技能，仅客户端运行。",
 })
 author = ""
-version = "0.1.0"
+version = "0.2.0"
 api_version = 10
 dst_compatible = true
 client_only_mod = true

@@ -1,4 +1,5 @@
 local PLENV = env
 GLOBAL.setfenv(1, GLOBAL)
 
--- Import hooks from postinit/ with PLENV.modimport when features are added.
+PLENV.modimport("postinit/prefabs/player.lua")
+PLENV.modimport("postinit/prefabs/shrouden.lua")

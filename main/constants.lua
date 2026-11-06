@@ -23,3 +23,37 @@ end
 DS_CONFIG = {
     DEBUG_MODE = debug_mode,
 }
+
+DS_BOSS_REGISTRY = { shrouden = {} }
+
+DS_DODGE = {
+    WATCH_PERIOD = 0.25,
+    CHECK_PERIOD = 2 * FRAMES,
+    PREPARE_TIMEOUT = 2,
+    BLINK_TIMEOUT = 2.5,
+    RECOVERY_TIMEOUT = 2,
+    RETRY_DELAY = 0.35,
+    COOLDOWN = 0.75,
+    MAX_BLINK_DISTANCE = 36,
+    MIN_BLINK_DISTANCE = 3,
+    HAZARD_CLEARANCE = {
+        shadowthrall_wings = 4,
+        shadowthrall_hands = 4,
+        shadowthrall_horns = 4,
+        shadowthrall_mouth = 4,
+        charliearena_spike = 1.2,
+    },
+}
+
+DS_SHROUDEN = {
+    FRONT_RADIUS = 12,
+    HALF_ANGLE = 60,
+    REAR_INNER = 4,
+    REAR_OUTER = 8,
+    REAR_STEP = 0.25,
+    ESCAPE_RADIUS = 20,
+    ESCAPE_STEP = 0.5,
+    ARC_STEP = 0.75,
+    LASER_RADIUS = 6,
+    PUDDLE_RADIUS = 4,
+}

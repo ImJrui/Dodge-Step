@@ -1,4 +1,4 @@
 return {
     NAME = "Dodge Step",
-    DESCRIPTION = "Client-only mod scaffold. No gameplay features are enabled.",
+    DESCRIPTION = "Automatically dodge Shrouden using Soul Hop or a Lazy Explorer. Client only.",
 }

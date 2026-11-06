@@ -4,7 +4,7 @@
 
 - 本项目是《Don't Starve Together》（饥荒联机版）的客户端 Mod，名称为 **闪身步 / Dodge Step**，运行环境为 **Lua 5.1**。
 - 保持 modinfo.lua 中的客户端定位：`client_only_mod = true`、`all_clients_require_mod = false`。
-- 当前为工程骨架，仅包含配置、日志、字符串和加载基础设施，没有具体玩法功能；不要将预留目录或入口误认为已实现功能。
+- 当前已实现 Shrouden 自动闪避，方案组件为 ds_shrouden；未来 Boss 方案沿用 ds_bossprefab 命名并提供 Enable / Disable。
 - 以现有实现和加载方式为准，修改范围围绕当前任务，避免无关重构。
 
 ## 游戏源码：仅按需读取，禁止修改
@@ -35,7 +35,7 @@ F:\SteamLibrary\steamapps\common\Don't Starve Together\data\databundles\scripts
 | main/toolutil.lua | 多处复用的公共函数，包括 DS_Log、DS_GetString；新增前搜索已有工具，避免重复实现。 |
 | main/strings.lua | 加载英文字符串，建立 STRINGS.DS_MOD，按游戏语言应用本 Mod 翻译；新增字符串文件或语言时同步接入。 |
 | main/popups.lua | 自定义弹窗注册入口，当前为空；与对应 Screen 及 HUD 的打开、关闭逻辑配套维护。 |
-| main/postinit.lua | 显式导入 postinit/ 下的 Hook，当前为空；新增文件必须接入加载链，文件存在不代表已加载。 |
+| main/postinit.lua | 显式导入 postinit/ 下的 Hook；新增文件必须接入加载链，文件存在不代表已加载。 |
 | main/keybinds.lua | 快捷键解析、注册及输入条件检查入口，当前为空；避免输入框获得焦点时误触发。 |
 | postinit/ | 对原版或兼容 Mod 的组件、预制件、界面及模块进行 Hook；按被 Hook 对象分类，不存放自定义组件主体。 |
 | postinit/components/ | 已有组件的 Hook。 |
@@ -49,7 +49,13 @@ F:\SteamLibrary\steamapps\common\Don't Starve Together\data\databundles\scripts
 | scripts/widgets/ | 自定义 Widget；与 postinit/widgets/ 中已有 Widget 的 Hook 区分。 |
 | strings/ | 运行时英文原文；common.lua 返回 STRINGS.DS_MOD 内的字符串表内容。 |
 | scripts/languages/ | strings.pot 为英文翻译模板，ds_chinese_s.po 为中文译文。 |
-| tests/ | 预留 Lua 5.1 离线测试目录；模拟客户端行为不代替游戏内验证。 |
+| scripts/components/ds_bosswatcher.lua | 只挂载当前玩家，低频核对客户端 Boss 登记，管理方案启停。 |
+| scripts/components/ds_shrouden.lua | Shrouden 方案组件；协调技能识别、传送事务、重试和取消，提供 Enable / Disable。 |
+| scripts/ds_shroudenplan.lua | 客户端动画与平面几何判断，背后扇环及备用落点的有界采样。 |
+| scripts/ds_blink.lua | 灵魂优先、鼠标物品安全取放、原版动作/RPC 与实际位移确认；原版自动装备及异步恢复必须配套维护。 |
+| postinit/prefabs/player.lua | 当前玩家激活、停用 Hook；其他玩家不挂载方案组件。 |
+| postinit/prefabs/shrouden.lua | Boss 生成、休眠、唤醒、移除登记；兼容原回调的参数及返回值。 |
+| tests/ | Lua 5.1 离线回归，使用原版 Class 和控制器动作函数；模拟客户端行为不代替游戏内验证。 |
 | anim/、images/ | 预留本 Mod 动画和图像资源；实际加入资源后通过独立 main/ 模块注册并接入加载链。 |
 | tools/ | 离线开发及资源构建工具；游戏运行时不得依赖开发工具或 Python。 |
 | docs/ | 设计、实施与验证记录；不参与游戏加载。 |
@@ -115,6 +121,19 @@ GLOBAL.setfenv(1, GLOBAL)
 - 新增或修改的代码注释必须**精简、使用英文，且每处不超过两行**。
 - 仅说明必要的意图、约束或不明显的原因，避免重复代码含义；不要为清理历史注释进行无关改动。
 - 本文和用户文档不受代码注释的语言及两行限制。
+
+### Boss 闪避与传送
+
+- 技能判断使用客户端同步的 AnimState、Transform、标签、replica 和 netvar；禁止依赖 Boss 服务端 sg、combat 或 timer。
+- Shrouden 前方为朝向 ±60°、距离 ≤12；首选后方 ±60° 且 4<r≤8，近优先；备用以 Boss 为圆心 r≤20，远优先。
+- 激光只在落位后、平面距离 ≤6 时触发；恶液 teleport_loop 在平面距离 ≤4 时触发。距离均忽略高度。
+- 落点同时满足四种 shadowthrall 至少 4、charliearena_spike 至少 1.2 的中心距离，并检查通行、地洞、碰撞和传送许可。
+- 使用 soulstealer 标签且携带灵魂时优先角色专用灵魂跳跃；橙宝石 king_cane 必须结合客户端 _gem 与 reticule 判断，不能仅凭 reticule。
+- 鼠标物品通过明确可接收的空槽存放，禁止为自动闪避调用可能丢物的 ReturnActiveItem；存放空间不足时放弃操作。
+- 适配原版 DoActionAutoEquip；预测回调允许法杖已从鼠标自动装备，取消和结束时有限恢复物品，不能覆盖用户更换的鼠标物品。
+- 库存预测变化不等于同步完成；取放及恢复阶段同时等待 inventory.classified:IsBusy() / container:IsBusy() 结束，并观察装备恢复回执，不能只检查 playercontroller:IsBusy()。
+- 传送杖使用无实体目标的点动作；灵魂跳跃使用角色专用点动作，避免地面杂物或装备抢占。保留原版验证，不写自定义服务端 RPC。
+- 请求提交不等于成功，必须确认实际位移；限制重复请求、失败日志和恢复任务生命周期。
 
 ## 测试与验证
 

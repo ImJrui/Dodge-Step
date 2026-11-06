@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: Dodge Step 0.1.0\n"
+"Project-Id-Version: Dodge Step 0.2.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "POT Version: 2.0\n"
@@ -12,5 +12,5 @@ msgstr ""
 
 #. STRINGS.DS_MOD.DESCRIPTION
 msgctxt "STRINGS.DS_MOD.DESCRIPTION"
-msgid "Client-only mod scaffold. No gameplay features are enabled."
+msgid "Automatically dodge Shrouden using Soul Hop or a Lazy Explorer. Client only."
 msgstr ""
