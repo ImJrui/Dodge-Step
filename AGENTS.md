@@ -56,13 +56,15 @@ F:\SteamLibrary\steamapps\common\Don't Starve Together\data\databundles\scripts
 | postinit/prefabs/player.lua | 当前玩家激活、停用 Hook；其他玩家不挂载方案组件。 |
 | postinit/prefabs/shrouden.lua | Boss 生成、休眠、唤醒、移除登记；兼容原回调的参数及返回值。 |
 | tests/ | Lua 5.1 离线回归，使用原版 Class 和控制器动作函数；模拟客户端行为不代替游戏内验证。 |
-| anim/、images/ | 预留本 Mod 动画和图像资源；实际加入资源后通过独立 main/ 模块注册并接入加载链。 |
+| anim/、images/ | 本 Mod 动画和图像资源；images/ds_modicon.tex 与 XML 为 Mod 菜单图标，由 modinfo.lua 引用；其他运行时资源通过独立 main/ 模块注册并接入加载链。 |
+| tools/ds_build_modicon.py | 从静态预览生成 Mod 图标，依赖 Pillow 和本机 Klei TextureConverter；仅供离线开发。 |
 | tools/ | 离线开发及资源构建工具；游戏运行时不得依赖开发工具或 Python。 |
 | docs/ | 设计、实施与验证记录；不参与游戏加载。 |
 | README.md | 用户和开发说明；用户可见功能、用法或目录变化时同步维护。 |
 | .gitignore | Git 忽略规则；不要为掩盖任务改动而添加忽略项。 |
 | .gitkeep | 保留空目录，不参与游戏加载；加入实际文件后可移除对应占位文件。 |
 
+- 当前 Mod 图标为 images/ds_modicon.tex 与 images/ds_modicon.xml，由 docs/media/ds_dodge_step.png 生成；新增图标版本时同步生成并核对 modinfo.lua 引用。
 - 当前没有 preview.tex、preview.xml 或 mod.manifest，不得引用不存在的资源，也不要为了占位伪造这些文件。
 - 后续需要图标时，preview.tex 是游戏纹理文件，不是 LaTeX 文件；仅在图标任务中调整图标资源。
 - 后续出现 mod.manifest 时，按游戏资源清单处理，非相关任务不要手工修改。
@@ -125,13 +127,15 @@ GLOBAL.setfenv(1, GLOBAL)
 ### Boss 闪避与传送
 
 - 技能判断使用客户端同步的 AnimState、Transform、标签、replica 和 netvar；禁止依赖 Boss 服务端 sg、combat 或 timer。
-- Shrouden 前方为朝向 ±60°、距离 ≤12；首选后方 ±60° 且 4<r≤8，近优先；备用以 Boss 为圆心 r≤20，远优先。
-- 激光只在落位后、平面距离 ≤6 时触发；恶液 teleport_loop 在平面距离 ≤4 时触发。距离均忽略高度。
+- Shrouden 传送门预警为前方半径 12、朝向 ±60° 扇形，与左右各宽 4、前向深度 4×tan30°（约 2.309）的矩形的并集；矩形局部坐标为 0≤前向≤4×tan30°、|横向|≤4，远端两角接到扇形两侧边界。触发和落点排除必须复用同一并集判定。首选后方 ±60° 且 4<r≤8，近优先；备用以 Boss 为圆心 r≤20，远优先。
+- 激光只在落位后、平面距离 ≤6.5 时触发；恶液 teleport_loop 在平面距离 ≤4.5 时触发。距离均忽略高度。
 - 落点同时满足四种 shadowthrall 至少 4、charliearena_spike 至少 1.2 的中心距离，并检查通行、地洞、碰撞和传送许可。
 - 使用 soulstealer 标签且携带灵魂时优先角色专用灵魂跳跃；橙宝石 king_cane 必须结合客户端 _gem 与 reticule 判断，不能仅凭 reticule。
+- 法杖查找及施法提交前排除剩余使用次数 ≤1 或冷却中的物品。orangestaff 客户端 percentused≤5（剩余耐久≤5%）不可用；使用同步 recharge 和 nomagiccast 检查充能，必要数据未同步时暂不选择。原版 king_cane 无使用次数耐久，只检查宝石、充能及标签；房主可用精确组件数据，但普通客户端必须有同步字段判断路径。
 - 鼠标物品通过明确可接收的空槽存放，禁止为自动闪避调用可能丢物的 ReturnActiveItem；存放空间不足时放弃操作。
-- 适配原版 DoActionAutoEquip；预测回调允许法杖已从鼠标自动装备，取消和结束时有限恢复物品，不能覆盖用户更换的鼠标物品。
-- 库存预测变化不等于同步完成；取放及恢复阶段同时等待 inventory.classified:IsBusy() / container:IsBusy() 结束，并观察装备恢复回执，不能只检查 playercontroller:IsBusy()。
+- 同帧准备阶段预先验证完整操作与空间，在同一次更新中按顺序发送原版存放、取杖、无实体目标 BLINK RPC；不逐步等待回执，也不伪造本地库存状态或修改原版 busy 标记。房主使用同步库存接口及原版控制器提交。
+- 适配服务端原版 DoActionAutoEquip；提交不等于服务端已经完成，完成或取消后必须等待实际库存状态再恢复物品。先恢复原武器，再将操作所属的鼠标物品存入物品栏；传送前鼠标持杖也不再恢复到鼠标。不能覆盖用户中途换上的无关鼠标物品。
+- 库存预测变化不等于同步完成；整组提交前检查库存及相关容器忙碌状态，提交中不再调用会因预测忙碌而丢失后续命令的本地库存接口。恢复阶段逐步等待 inventory.classified:IsBusy() / container:IsBusy() 结束及装备恢复回执，不能只检查 playercontroller:IsBusy()。恢复最多 5 秒，超时记录 WARN，禁止通过丢弃物品清空鼠标。
 - 传送杖使用无实体目标的点动作；灵魂跳跃使用角色专用点动作，避免地面杂物或装备抢占。保留原版验证，不写自定义服务端 RPC。
 - 请求提交不等于成功，必须确认实际位移；限制重复请求、失败日志和恢复任务生命周期。
 

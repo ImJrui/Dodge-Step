@@ -12,90 +12,123 @@ local function ready(player)
         and player.replica.inventory ~= nil and player.components.playeractionpicker ~= nil
 end
 
-function Blink:Restore(operation)
-    if operation == nil or operation.tool == nil then return end
-    local player, source, tool = self.player, operation.source, operation.tool
-    local deadline = GetTime() + DS_DODGE.RECOVERY_TIMEOUT
-    local function equip_previous(inventory, equipped)
-        local previous = operation.previoushands
-        if equipped ~= nil or previous == nil or previous == tool or not previous:IsValid()
-            or not DS_FindCarriedSlot(inventory, previous) then return true end
-        if operation.reequip_at == nil or GetTime() - operation.reequip_at >= 0.25 then
-            inventory:UseItemFromInvTile(previous)
-            operation.reequip_at = GetTime()
-        end
-        return false
+local function container_available(container, inventory, player)
+    return container == inventory or (container.inst ~= nil and container.inst:IsValid()
+        and container:IsOpenedBy(player))
+end
+
+local function prepare_inventory(player, operation)
+    local inventory = player.replica.inventory
+    local active = inventory:GetActiveItem()
+    local stash, stashslot
+    if active and active ~= operation.tool then
+        stash, stashslot = DS_FindEmptySlot(inventory, active)
+        if stash == nil then return nil, "inventory_full" end
+        if not container_available(stash, inventory, player) then return nil, "container_closed" end
+        if DS_IsInventoryBusy(stash) then return nil, "busy" end
     end
-    local function restore_cursor(inventory, active, equipped)
-        local previous, swap = operation.previoushands, operation.cursor_swap
-        if swap then
-            if DS_IsInventoryBusy(swap.container) then return false end
-            if active == tool then return true end
+    local source = operation.source
+    if source and source.container then
+        if not container_available(source.container, inventory, player) then return nil, "container_closed" end
+        if DS_IsInventoryBusy(source.container) then return nil, "busy" end
+        if source.container:GetItemInSlot(source.slot) ~= operation.tool then return nil, "resource_changed" end
+    elseif source and source.kind == "equip" then
+        if inventory:GetNumSlots() == 0 then return nil, "inventory_full" end
+        if inventory:GetEquippedItem(source.slot) ~= operation.tool then return nil, "resource_changed" end
+    elseif source and active ~= operation.tool then
+        return nil, "cursor_changed"
+    end
+    local previous = inventory:GetEquippedItem(EQUIPSLOTS.HANDS)
+    if operation.tool and previous ~= operation.tool and (previous or source.kind == "cursor") then
+        local stored = previous or operation.tool
+        local room = false
+        for _, container in ipairs({ inventory, inventory:GetOverflowContainer() }) do
+            if container_available(container, inventory, player) and not DS_IsInventoryBusy(container) then
+                for slot = 1, container:GetNumSlots() do
+                    local freed = source.container == container and source.slot == slot
+                    local occupied = container:GetItemInSlot(slot) ~= nil and not freed
+                    if not occupied and not (stash == container and stashslot == slot)
+                        and container:CanTakeItemInSlot(stored, slot) then room = true break end
+                end
+            end
+        end
+        if not room then return nil, "inventory_full" end
+    end
+    return { stash = stash, stashslot = stashslot, cursor = active, previoushands = previous }
+end
+
+function Blink:Restore(operation)
+    if operation == nil or not operation.sent then return end
+    local player, tool = self.player, operation.tool
+    local deadline = GetTime() + DS_DODGE.RECOVERY_TIMEOUT
+    local function restore()
+        if player ~= ThePlayer or not player:IsValid() then return true end
+        local inventory, controller = player.replica.inventory, player.components.playercontroller
+        if inventory == nil then return true end
+        if (controller and controller:IsBusy()) or DS_IsInventoryBusy(inventory) then return false end
+        local active, equipped = inventory:GetActiveItem(), inventory:GetEquippedItem(EQUIPSLOTS.HANDS)
+        if not operation.inventory_seen then
+            operation.inventory_seen = (operation.completed and operation.source and operation.source.kind == "equip")
+                or not tool
+                or (equipped == tool and operation.source.kind ~= "equip")
+                or (active == tool and operation.source.kind ~= "cursor")
+            if not operation.inventory_seen then return false end
+        end
+        local previous = operation.previoushands
+        if active and active ~= tool and active ~= previous and active ~= operation.cursor then return true end
+        local restore_weapon = previous and previous:IsValid()
+        if restore_weapon and equipped ~= previous and (equipped == nil or equipped == tool) then
             if active == previous and equipped == nil then
                 inventory:EquipActiveItem()
                 return false
-            elseif active == nil and swap.container:GetItemInSlot(swap.slot) == tool then
-                swap.container:TakeActiveItemFromAllOfSlot(swap.slot)
-                return false
+            elseif active == tool then
+                local container, slot = DS_FindCarriedSlot(inventory, previous)
+                if container and container_available(container, inventory, player) then
+                    if DS_IsInventoryBusy(container) then return false end
+                    if container:CanTakeItemInSlot(tool, slot) then
+                        operation.waitcontainer = container
+                        container:SwapActiveItemWithSlot(slot)
+                        return false
+                    end
+                end
+            elseif active == nil then
+                if equipped == tool then
+                    inventory:TakeActiveItemFromEquipSlot(EQUIPSLOTS.HANDS)
+                    return false
+                end
+                local container = DS_FindCarriedSlot(inventory, previous)
+                if container then
+                    if DS_IsInventoryBusy(container) then return false end
+                    inventory:UseItemFromInvTile(previous)
+                    return false
+                end
             end
-            return true
-        end
-        if active ~= nil and active ~= tool then return true end
-        if equipped == tool then
+        elseif tool and equipped == tool and previous ~= tool and active == nil then
+            if inventory:GetNumSlots() == 0 then return true end
             inventory:TakeActiveItemFromEquipSlot(EQUIPSLOTS.HANDS)
-            operation.took = true
             return false
-        elseif active == tool then
-            if equipped ~= nil or previous == nil or not previous:IsValid() then return true end
-            local container, slot = DS_FindCarriedSlot(inventory, previous)
-            if not container then return true end
+        end
+        -- Recovery always empties operation-owned cursor items instead of restoring a cursor staff.
+        if active then
+            local container, slot = DS_FindEmptySlot(inventory, active)
+            if not container then return false end
+            if not container_available(container, inventory, player) then return false end
             if DS_IsInventoryBusy(container) then return false end
-            if not container:CanTakeItemInSlot(tool, slot) then return true end
-            operation.cursor_swap = { container = container, slot = slot }
-            container:SwapActiveItemWithSlot(slot)
+            operation.waitcontainer = container
+            container:PutAllOfActiveItemInSlot(slot)
             return false
         end
-        return not operation.took
-    end
-    local function restore()
-        local inventory = player.replica.inventory
-        if not player:IsValid() or player ~= ThePlayer or inventory == nil or not tool:IsValid() then return true end
-        local controller = player.components.playercontroller
-        if (controller and controller:IsBusy()) or DS_IsInventoryBusy(inventory)
-            or (operation.waitcontainer and DS_IsInventoryBusy(operation.waitcontainer))
-            or (source.container and DS_IsInventoryBusy(source.container)) then return false end
-        local active, equipped = inventory:GetActiveItem(), inventory:GetEquippedItem(EQUIPSLOTS.HANDS)
-        if source.kind == "cursor" then return restore_cursor(inventory, active, equipped) end
-        if active ~= nil and active ~= tool then return true end
-        if source.kind == "equip" and equipped == tool then return true end
-        if equipped == tool then
-            inventory:TakeActiveItemFromEquipSlot(EQUIPSLOTS.HANDS)
-            operation.took = true
-            return false
-        elseif active == tool then
-            if source.kind == "equip" and equipped == nil then
-                inventory:EquipActiveItem()
-            elseif source.container and source.container:GetItemInSlot(source.slot) == nil
-                and source.container:CanTakeItemInSlot(tool, source.slot) then
-                source.container:PutAllOfActiveItemInSlot(source.slot)
-            else
-                local container, slot = DS_FindEmptySlot(inventory, tool)
-                if container == nil then return true end
-                container:PutAllOfActiveItemInSlot(slot)
-            end
-            operation.returned = true
-            return false
-        elseif operation.took and not operation.returned then
-            return false
-        end
-        return equip_previous(inventory, equipped)
+        if operation.waitcontainer and DS_IsInventoryBusy(operation.waitcontainer) then return false end
+        return true
     end
     if self.recovery then self.recovery:Cancel() self.recovery = nil end
     if restore() then return end
     self.recovery = player:DoPeriodicTask(0.1, function()
-        if GetTime() >= deadline or restore() then
+        local done = restore()
+        if done or GetTime() >= deadline then
             self.recovery:Cancel()
             self.recovery = nil
+            if not done then DS_Log("WARN", "Blink inventory recovery timed out") end
         end
     end)
 end
@@ -103,6 +136,7 @@ end
 function Blink:Finish(result, reason)
     local operation = self.pending
     self.pending = nil
+    if operation then operation.completed = result == "success" end
     self:Restore(operation)
     return result, reason
 end
@@ -117,71 +151,75 @@ function Blink:Start(boss, phase)
     if not soul then
         tool, source = DS_FindBlinkStaff(inventory)
         if tool == nil then return false, "no_resource" end
-        if source.kind == "equip" and inventory:GetNumSlots() == 0 then return false, "inventory_full" end
     end
     self.pending = { boss = boss, phase = phase, mode = soul and "soul" or "staff", tool = tool,
-        source = source, stage = "prepare", deadline = GetTime() + DS_DODGE.PREPARE_TIMEOUT,
-        previoushands = inventory:GetEquippedItem(EQUIPSLOTS.HANDS) }
+        source = source, deadline = GetTime() + DS_DODGE.PREPARE_TIMEOUT }
     return true
 end
 
-function Blink:Cast(operation)
+function Blink:Submit(operation)
     local player = self.player
     local inventory, controller = player.replica.inventory, player.components.playercontroller
+    if DS_IsInventoryBusy(inventory) or controller:IsBusy() then return end
     if operation.mode == "soul" then
         if not player:CanSoulhop() or not inventory:Has("wortox_soul", 1) then return self:Finish("failed", "no_resource") end
     elseif not DS_IsBlinkStaff(operation.tool) then
         return self:Finish("failed", "no_resource")
     end
-    local hands = inventory:GetEquippedItem(EQUIPSLOTS.HANDS)
-    if operation.mode == "staff" and hands ~= nil and hands ~= operation.tool
-        and DS_FindEmptySlot(inventory, hands) == nil then
-        return self:Finish("failed", "inventory_full")
+    local prepared, reason = prepare_inventory(player, operation)
+    if not prepared then
+        if reason == "busy" then return end
+        return self:Finish("failed", reason)
     end
     local safe = DS_BuildLandingValidator(player, operation.boss, operation.mode)
     local point = Plan.FindLanding(operation.boss, player, operation.phase, safe)
-    if point == nil then return self:Finish("failed", "no_landing") end
+    if not point then return self:Finish("failed", "no_landing") end
     local picker = player.components.playeractionpicker
     local actions = operation.mode == "soul" and picker:GetPointSpecialActions(point, nil, true)
-        or picker:GetRightClickActions(point, nil)
+        or picker:GetPointActions(point, operation.tool, true, nil)
     local action = actions[1]
-    if action == nil or action.action ~= ACTIONS.BLINK or action.invobject ~= operation.tool then
+    if not action or action.action ~= ACTIONS.BLINK or action.invobject ~= operation.tool then
         return self:Finish("failed", "no_action")
     end
+    local source = operation.source
+    local equipid = source and source.kind == "equip" and require("equipslotutil").ToID(source.slot) or nil
+    if source and source.kind == "equip" and equipid == nil then return self:Finish("failed", "equip_slot") end
+    operation.previoushands, operation.cursor = prepared.previoushands, prepared.cursor
     operation.point = point
-    local ox, _, oz = player.Transform:GetWorldPosition()
-    operation.ox, operation.oz = ox, oz
-    operation.stage = "inflight"
+    local x, _, z = player.Transform:GetWorldPosition()
+    operation.ox, operation.oz = x, z
+    operation.stage, operation.sent = "inflight", true
     operation.deadline = GetTime() + DS_DODGE.BLINK_TIMEOUT
-    local function send()
-        if self.pending ~= operation or operation.sent then return end
-        if not ready(player) or not DS_IsBossLoaded(operation.boss)
-            or Plan.GetThreat(operation.boss, player) ~= operation.phase
-            or (operation.mode == "soul" and (inventory:GetActiveItem() ~= nil
-                or not player:CanSoulhop() or not inventory:Has("wortox_soul", 1)))
-            or (operation.mode == "staff" and not DS_IsBlinkStaff(operation.tool))
-            or (operation.mode == "staff" and inventory:GetActiveItem() ~= operation.tool
-                and inventory:GetEquippedItem(EQUIPSLOTS.HANDS) ~= operation.tool)
-            or not DS_BuildLandingValidator(player, operation.boss, operation.mode)(point) then return end
-        local platform, x, z = controller:GetPlatformRelativePosition(point.x, point.z)
-        operation.sent = true
+    if controller.ismastersim then
+        if prepared.stash then prepared.stash:PutAllOfActiveItemInSlot(prepared.stashslot) end
+        if operation.mode == "staff" and inventory:GetActiveItem() ~= operation.tool then
+            if source.kind == "equip" then inventory:TakeActiveItemFromEquipSlot(source.slot)
+            else source.container:TakeActiveItemFromAllOfSlot(source.slot) end
+        end
+        if inventory:GetActiveItem() ~= operation.tool then return self:Finish("failed", "inventory_changed") end
+        controller:DoAction(action)
+    else
+        -- Original server RPC handlers process these requests in order; no local busy prediction is changed.
+        if prepared.stash then
+            SendRPCToServer(RPC.PutAllOfActiveItemInSlot, prepared.stashslot,
+                prepared.stash ~= inventory and prepared.stash.inst or nil)
+        end
+        if source and source.kind == "equip" then
+            SendRPCToServer(RPC.TakeActiveItemFromEquipSlot, equipid)
+        elseif source and source.container then
+            SendRPCToServer(RPC.TakeActiveItemFromAllOfSlot, source.slot,
+                source.container ~= inventory and source.container.inst or nil)
+        end
+        local platform, px, pz = controller:GetPlatformRelativePosition(point.x, point.z)
         if operation.mode == "soul" then
-            SendRPCToServer(RPC.ControllerAltActionButtonPoint, ACTIONS.BLINK.code, x, z,
+            SendRPCToServer(RPC.ControllerAltActionButtonPoint, ACTIONS.BLINK.code, px, pz,
                 true, true, true, ACTIONS.BLINK.mod_name, platform, platform ~= nil)
         else
-            -- A nil target forces a point action even when loot covers the destination.
-            SendRPCToServer(RPC.RightClick, ACTIONS.BLINK.code, x, z, nil, nil,
+            SendRPCToServer(RPC.RightClick, ACTIONS.BLINK.code, px, pz, nil, nil,
                 true, 0, true, ACTIONS.BLINK.mod_name, platform, platform ~= nil)
         end
-        DS_Log("DEBUG", "Blink requested", operation.phase, operation.mode)
     end
-    if controller.ismastersim then
-        operation.sent = true
-    else
-        action.preview_cb = send
-        action.non_preview_cb = send
-    end
-    controller:DoAction(action)
+    DS_Log("DEBUG", "Blink batch requested", operation.phase, operation.mode)
 end
 
 function Blink:Update()
@@ -193,58 +231,14 @@ function Blink:Update()
         local px, _, pz = player.Transform:GetWorldPosition()
         local dx, dz = px - operation.ox, pz - operation.oz
         local ex, ez = px - operation.point.x, pz - operation.point.z
-        if operation.sent and dx * dx + dz * dz >= DS_DODGE.MIN_BLINK_DISTANCE ^ 2 and ex * ex + ez * ez <= 4 then
+        if dx * dx + dz * dz >= DS_DODGE.MIN_BLINK_DISTANCE ^ 2 and ex * ex + ez * ez <= 4 then
             return self:Finish("success")
-        elseif GetTime() >= operation.deadline then
-            return self:Finish("failed", "timeout")
-        end
+        elseif GetTime() >= operation.deadline then return self:Finish("failed", "timeout") end
         return
     end
     if Plan.GetThreat(operation.boss, player) ~= operation.phase then return self:Finish("failed", "expired") end
     if GetTime() >= operation.deadline then return self:Finish("failed", "timeout") end
-    local inventory = player.replica.inventory
-    if DS_IsInventoryBusy(inventory)
-        or (operation.waitcontainer and DS_IsInventoryBusy(operation.waitcontainer)) then return end
-    operation.waitcontainer = nil
-    local active = inventory:GetActiveItem()
-    if operation.stage == "stash" then
-        if active == operation.cursor then return end
-        if active ~= nil then return self:Finish("failed", "cursor_changed") end
-        operation.stage = "prepare"
-    elseif operation.stage == "take" then
-        if active == nil then return end
-        if active ~= operation.tool then return self:Finish("failed", "cursor_changed") end
-    end
-    local controller = player.components.playercontroller
-    if controller:IsBusy() then return end
-    if active ~= nil and not (operation.mode == "staff" and active == operation.tool) then
-        local container, slot = DS_FindEmptySlot(inventory, active)
-        if container == nil then return self:Finish("failed", "inventory_full") end
-        operation.cursor, operation.stage = active, "stash"
-        operation.waitcontainer = container
-        container:PutAllOfActiveItemInSlot(slot)
-        return
-    end
-    if operation.mode == "staff" and active == nil then
-        local tool, source = DS_FindBlinkStaff(inventory)
-        if tool ~= operation.tool then return self:Finish("failed", "resource_changed") end
-        operation.source = source
-        operation.stage = "take"
-        operation.took = true
-        operation.waitcontainer = source.container
-        if source.container and DS_IsInventoryBusy(source.container) then
-            operation.stage = "prepare"
-            operation.took = false
-            return
-        end
-        if source.kind == "equip" then
-            inventory:TakeActiveItemFromEquipSlot(source.slot)
-        else
-            source.container:TakeActiveItemFromAllOfSlot(source.slot)
-        end
-        return
-    end
-    return self:Cast(operation)
+    return self:Submit(operation)
 end
 
 function Blink:Cancel()

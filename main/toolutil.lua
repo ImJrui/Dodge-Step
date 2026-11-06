@@ -50,10 +50,31 @@ end
 
 function DS_IsBlinkStaff(item)
     if item == nil or not item:IsValid() or item:HasTag("nomagiccast") then return false end
-    if item.replica.inventoryitem and item.replica.inventoryitem:IsLockedInSlot() then return false end
-    return item.prefab == "orangestaff"
+    if not (item.prefab == "orangestaff"
         or (item.prefab == "king_cane" and item._gem ~= nil and item._gem:value() == "orangegem"
-            and item.components.reticule ~= nil)
+            and item.components.reticule ~= nil)) then return false end
+    local inventoryitem = item.replica.inventoryitem
+    if inventoryitem == nil or inventoryitem:IsLockedInSlot() then return false end
+    local classified = inventoryitem.classified
+    local rechargeable = item.components.rechargeable
+    if rechargeable then
+        if not rechargeable:IsCharged() then return false end
+    elseif classified and classified.recharge then
+        local charge = classified.recharge:value()
+        if charge < DS_STAFF.CHARGE_FULL
+            or (item:HasTag("rechargeable") and charge ~= DS_STAFF.CHARGE_FULL) then return false end
+    elseif item:HasTag("rechargeable") then
+        return false
+    end
+    local finiteuses = item.components.finiteuses
+    if finiteuses then
+        return finiteuses:GetUses() > DS_STAFF.MIN_USES
+    elseif item.prefab == "orangestaff" then
+        if classified == nil or classified.percentused == nil then return false end
+        local percent = classified.percentused:value()
+        return percent ~= DS_STAFF.USAGE_ABSENT and percent > DS_STAFF.ORANGE_MIN_PERCENT
+    end
+    return true
 end
 
 function DS_FindBlinkStaff(inventory)

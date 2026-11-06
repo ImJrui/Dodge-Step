@@ -20,6 +20,8 @@ dst_compatible = true
 client_only_mod = true
 all_clients_require_mod = false
 server_filter_tags = {}
+icon_atlas = "images/ds_modicon.xml"
+icon = "ds_modicon.tex"
 
 configuration_options = {
     {

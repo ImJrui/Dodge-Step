@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Atlas>
+  <Texture filename="ds_modicon.tex" />
+  <Elements>
+    <Element name="ds_modicon.tex" u1="0.00048828125" v1="0.00048828125" u2="0.99951171875" v2="0.99951171875" />
+  </Elements>
+</Atlas>

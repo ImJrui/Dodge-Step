@@ -15,6 +15,17 @@ function Plan.GetPhase(boss)
     end
 end
 
+local function in_portal_range(dx, dz, heading)
+    local forward = dx * cos(heading) - dz * sin(heading)
+    local lateral = dx * sin(heading) + dz * cos(heading)
+    local distance2 = dx * dx + dz * dz
+    local sector = distance2 <= DS_SHROUDEN.FRONT_RADIUS ^ 2 + 0.000001
+        and forward >= sqrt(distance2) * cos(DS_SHROUDEN.HALF_ANGLE * radians) - 0.000001
+    local rectangle = forward >= 0 and forward <= DS_SHROUDEN.FRONT_RECT_LENGTH + 0.000001
+        and math.abs(lateral) <= DS_SHROUDEN.FRONT_RECT_HALF_WIDTH + 0.000001
+    return sector or rectangle
+end
+
 function Plan.GetThreat(boss, player)
     local phase = Plan.GetPhase(boss)
     if phase == nil then return end
@@ -23,12 +34,7 @@ function Plan.GetThreat(boss, player)
     local dx, dz = px - bx, pz - bz
     local dist2 = dx * dx + dz * dz
     if phase == "portal" then
-        local heading = boss.Transform:GetRotation() * radians
-        local dot = dx * cos(heading) - dz * sin(heading)
-        if dist2 <= DS_SHROUDEN.FRONT_RADIUS ^ 2 + 0.000001
-            and dot >= sqrt(dist2) * cos(DS_SHROUDEN.HALF_ANGLE * radians) - 0.000001 then
-            return phase
-        end
+        if in_portal_range(dx, dz, boss.Transform:GetRotation() * radians) then return phase end
     elseif dist2 <= (phase == "laser" and DS_SHROUDEN.LASER_RADIUS or DS_SHROUDEN.PUDDLE_RADIUS) ^ 2 then
         return phase
     end
@@ -41,8 +47,7 @@ function Plan.FindLanding(boss, player, phase, canland)
     local function candidate(radius, angle)
         if phase == "laser" and radius <= DS_SHROUDEN.LASER_RADIUS then return end
         if phase == "puddle" and radius <= DS_SHROUDEN.PUDDLE_RADIUS then return end
-        if phase == "portal" and radius <= DS_SHROUDEN.FRONT_RADIUS
-            and cos(angle - behind + math.pi) >= cos(DS_SHROUDEN.HALF_ANGLE * radians) - 0.000001 then return end
+        if phase == "portal" and in_portal_range(radius * cos(angle), -radius * sin(angle), behind - math.pi) then return end
         local pt = Vector3(bx + radius * cos(angle), 0, bz - radius * sin(angle))
         local dx, dz = pt.x - px, pt.z - pz
         local distance = dx * dx + dz * dz
