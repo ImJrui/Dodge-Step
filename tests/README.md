@@ -3,6 +3,7 @@
 在项目根目录使用 Lua 5.1 逐个执行：
 
 ```text
+lua51 tests/ds_config_spec.lua
 lua51 tests/ds_shroudenplan_spec.lua
 lua51 tests/ds_blink_spec.lua
 lua51 tests/ds_lifecycle_spec.lua
@@ -13,6 +14,7 @@ lua51 tests/ds_loading_spec.lua
 
 测试默认使用 AGENTS.md 指定的本地游戏脚本目录。安装位置不同可通过 DS_GAME_SCRIPTS 指向 data/databundles/scripts。
 
+- ds_config_spec：14 例，覆盖中英文配置菜单及全部档位、默认触发边界、各技能独立关闭及全部关闭、非法配置回退、各档位的落点排除与最小传送门半径下的矩形判定。
 - ds_shroudenplan_spec：14 例，覆盖技能动画、当前配置的激光/恶液距离边界、扇形与深度 4×tan30° 矩形并集、衔接及旋转边界、缩短矩形后的备用落点、背后扇环、搜索排序和拒绝仍在危险区的落点。
 - ds_blink_spec：41 例，覆盖同次更新时间戳、原版服务端 RPC 顺序、分开处理且无客户端回执、背包/装备槽、房主与无预测客户端、灵魂优先、原武器恢复和鼠标清空、晚到回执、装备来源取消、服务端忙碌拒绝、满包及未知耐久保护。
 - ds_lifecycle_spec：8 例，覆盖当前玩家、Boss 先到、多 Boss、休眠/唤醒/移除、原回调参数与返回值、玩家停用/重新激活。

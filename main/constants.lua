@@ -20,8 +20,21 @@ if type(debug_mode) ~= "number"
     debug_mode = DS_LOG_LEVEL.INFO
 end
 
+local function get_distance(name, minimum, maximum, step, default)
+    local value = PLENV.GetModConfigData(name)
+    if value == false then return false end
+    if type(value) ~= "number" or value < minimum or value > maximum
+        or (value - minimum) % step ~= 0 then
+        return default
+    end
+    return value
+end
+
 DS_CONFIG = {
     DEBUG_MODE = debug_mode,
+    PORTAL_DISTANCE = get_distance("DS_PORTAL_DISTANCE", 10, 18, 1, 12),
+    PUDDLE_DISTANCE = get_distance("DS_PUDDLE_DISTANCE", 4, 6, 0.5, 4.5),
+    LASER_DISTANCE = get_distance("DS_LASER_DISTANCE", 6, 8, 0.5, 7),
 }
 
 DS_BOSS_REGISTRY = { shrouden = {} }
@@ -41,12 +54,12 @@ DS_DODGE = {
         shadowthrall_hands = 4,
         shadowthrall_horns = 4,
         shadowthrall_mouth = 4,
-        charliearena_spike = 1.2,
+        charliearena_spike = 2,
     },
 }
 
 DS_SHROUDEN = {
-    FRONT_RADIUS = 14,
+    FRONT_RADIUS = DS_CONFIG.PORTAL_DISTANCE,
     HALF_ANGLE = 60,
     FRONT_RECT_LENGTH = 4 * math.tan(math.pi / 6),
     FRONT_RECT_HALF_WIDTH = 4,
@@ -56,8 +69,8 @@ DS_SHROUDEN = {
     ESCAPE_RADIUS = 20,
     ESCAPE_STEP = 0.5,
     ARC_STEP = 0.75,
-    LASER_RADIUS = 7.5,
-    PUDDLE_RADIUS = 4.5,
+    LASER_RADIUS = DS_CONFIG.LASER_DISTANCE,
+    PUDDLE_RADIUS = DS_CONFIG.PUDDLE_DISTANCE,
 }
 
 DS_STAFF = {

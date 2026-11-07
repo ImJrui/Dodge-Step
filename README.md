@@ -8,9 +8,19 @@ Boss 生成或进入当前客户端加载范围时，自动启用玩家的 `ds_s
 
 | 技能 | 触发条件 | 落点优先级 |
 | --- | --- | --- |
-| 传送门召唤攻击 | punch_pre / punch_loop，玩家进入前方半径 14、120° 扇形与前向深度 4×tan30°、左右各宽 4 矩形的并集 | 后方 120°、4<半径≤8，先选离 Boss 更近的位置；无合适点时使用备用区域 |
-| 眼睛镭射 | optic_blast_pre2 / loop / pre3，Boss 已传到目标附近，平面距离 ≤7.5 | 备用区域 |
-| 恶液追击 | teleport_loop，平面距离 ≤4.5 | 备用区域 |
+| 传送门召唤攻击 | punch_pre / punch_loop，玩家进入前方可配置半径（默认 12）、120° 扇形与前向深度 4×tan30°、左右各宽 4 矩形的并集 | 后方 120°、4<半径≤8，先选离 Boss 更近的位置；无合适点时使用备用区域 |
+| 眼睛镭射 | optic_blast_pre2 / loop / pre3，Boss 已传到目标附近，平面距离 ≤配置值（默认 7） | 备用区域 |
+| 恶液追击 | teleport_loop，平面距离 ≤配置值（默认 4.5） | 备用区域 |
+
+在 Mod 配置中可分别设置三种技能的**闪避触发距离**，选择“不躲避”只关闭对应技能。距离不是每次闪现的移动长度，落点仍按下述规则选择。
+
+| 配置 | 可选值 | 默认值 |
+| --- | --- | --- |
+| 传送门闪避距离 | 不躲避；10～18，步长 1 | 12 |
+| 恶液追击闪避距离 | 不躲避；4～6，步长 0.5 | 4.5 |
+| 镭射激光闪避距离 | 不躲避；6～8，步长 0.5 | 7 |
+
+未设置或配置值不合法时使用各项默认值。触发边界包含所选距离；落点排除同步使用所选范围。
 
 矩形从 Boss 位置向正前方延伸 4×tan30° ≈ 2.309，左右各宽 4（总宽 8）；远端两个角恰好接到扇形的两侧边界，再与扇形取并集。触发和落点排除使用同一并集判断。
 
@@ -40,7 +50,7 @@ Mod 菜单图标使用当前静态预览 `docs/media/ds_dodge_step.png`，包含
 ## 目录与开发约定
 
 - modmain.lua：仅按顺序导入 main/ 模块。
-- main/constants.lua：DS_CONFIG、DS_LOG_LEVEL、DS_DODGE、DS_SHROUDEN、DS_STAFF、DS_BOSS_REGISTRY。
+- main/constants.lua：配置读取与校验、DS_CONFIG、DS_LOG_LEVEL、DS_DODGE、DS_SHROUDEN、DS_STAFF、DS_BOSS_REGISTRY。
 - main/toolutil.lua：DS_Log、DS_GetString、Boss 登记、法杖/空槽查询、落点环境验证。
 - main/postinit.lua：显式导入 postinit/prefabs/player.lua 和 shrouden.lua。
 - scripts/components/ds_bosswatcher.lua：只在 ThePlayer 上运行，0.25 秒核对登记表。
@@ -73,6 +83,7 @@ DS_ 公共定义写入 GLOBAL，模组专用 API 通过 PLENV 访问。未来 Bo
 在工程根目录使用实际 Lua 5.1 运行：
 
 ```text
+lua51 tests/ds_config_spec.lua
 lua51 tests/ds_shroudenplan_spec.lua
 lua51 tests/ds_blink_spec.lua
 lua51 tests/ds_lifecycle_spec.lua
@@ -83,6 +94,8 @@ lua51 tests/ds_loading_spec.lua
 
 也可使用 Python 的 lupa.lua51.LuaRuntime 加载测试。测试模拟网络、库存同步和角色实体，不能代替实际客户端运行。
 
-游戏内仍需验证：三种技能的识别和反应时机、普通远程客户端的移动预测开关、灵魂与两种法杖、满包及地面杂物、多 Boss／离开再进入范围、幽灵与重连、中英文 Mod 菜单显示。作者：TUTU。Mod 菜单以中英文简要介绍支持闪避的技能和闪避方式。
+游戏内仍需验证：三项配置的全部档位、独立关闭和中英文菜单，三种技能的识别和反应时机、普通远程客户端的移动预测开关、灵魂与两种法杖、满包及地面杂物、多 Boss／离开再进入范围、幽灵与重连、中英文 Mod 菜单显示。作者：TUTU。Mod 菜单以中英文简要介绍支持闪避的技能和闪避方式。
 
 2026-11-06 离线验证：21 个 Lua 文件通过 Lua 5.1 语法检查，66 组回归通过，双语资源一致性及 git diff --check 通过。普通远程客户端实战和游戏内 UI 尚未验证。
+
+2026-11-07 距离配置离线验证：22 个 Lua 文件通过 Lua 5.1 语法检查，80 组回归通过（新增配置回归 14 组），中英文元信息与 PO/POT 一致性及 git diff --check 通过。三项配置在普通远程客户端中的触发距离、独立关闭和游戏内菜单显示仍待实测。

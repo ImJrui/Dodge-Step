@@ -1,6 +1,7 @@
 local Plan = {}
 local cos, sin, sqrt, ceil = math.cos, math.sin, math.sqrt, math.ceil
 local radians = math.pi / 180
+local phase_radius = { portal = "FRONT_RADIUS", laser = "LASER_RADIUS", puddle = "PUDDLE_RADIUS" }
 
 function Plan.GetPhase(boss)
     local anim = boss.AnimState
@@ -28,25 +29,27 @@ end
 
 function Plan.GetThreat(boss, player)
     local phase = Plan.GetPhase(boss)
-    if phase == nil then return end
+    local danger_radius = DS_SHROUDEN[phase_radius[phase]]
+    if not danger_radius then return end
     local bx, _, bz = boss.Transform:GetWorldPosition()
     local px, _, pz = player.Transform:GetWorldPosition()
     local dx, dz = px - bx, pz - bz
     local dist2 = dx * dx + dz * dz
     if phase == "portal" then
         if in_portal_range(dx, dz, boss.Transform:GetRotation() * radians) then return phase end
-    elseif dist2 <= (phase == "laser" and DS_SHROUDEN.LASER_RADIUS or DS_SHROUDEN.PUDDLE_RADIUS) ^ 2 then
+    elseif dist2 <= danger_radius ^ 2 then
         return phase
     end
 end
 
 function Plan.FindLanding(boss, player, phase, canland)
+    local danger_radius = DS_SHROUDEN[phase_radius[phase]]
+    if not danger_radius then return end
     local bx, _, bz = boss.Transform:GetWorldPosition()
     local px, _, pz = player.Transform:GetWorldPosition()
     local behind = boss.Transform:GetRotation() * radians + math.pi
     local function candidate(radius, angle)
-        if phase == "laser" and radius <= DS_SHROUDEN.LASER_RADIUS then return end
-        if phase == "puddle" and radius <= DS_SHROUDEN.PUDDLE_RADIUS then return end
+        if phase ~= "portal" and radius <= danger_radius then return end
         if phase == "portal" and in_portal_range(radius * cos(angle), -radius * sin(angle), behind - math.pi) then return end
         local pt = Vector3(bx + radius * cos(angle), 0, bz - radius * sin(angle))
         local dx, dz = pt.x - px, pt.z - pz
