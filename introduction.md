@@ -7,7 +7,7 @@
 当 Boss 释放传送门召唤时，如果玩家位于 Boss 前方约 [b]12[/b] 距离内，自动闪现到 Boss 身后。
 
 [b]镭射激光[/b]
-当 Boss 传送到玩家附近释放激光时，如果玩家与 Boss 的距离不超过 [b]7[/b]，自动闪现远离 Boss。
+当 Boss 传送到玩家附近释放激光时，如果玩家与 Boss 的距离不超过 [b]7.5[/b]，自动闪现远离 Boss。
 
 [b]恶液追击[/b]
 当 Boss 化身恶液追击时，如果玩家与 Boss 的距离不超过 [b]4.5[/b]，自动闪现拉开距离。
@@ -28,7 +28,7 @@ Automatically dodge Shrouden's attacks.
 When the boss summons portals, automatically blink behind it if you are in front of the boss within about [b]12 units[/b].
 
 [b]Optic Blast[/b]
-When the boss teleports near you to fire its laser, automatically blink away if you are within [b]7 units[/b] of the boss.
+When the boss teleports near you to fire its laser, automatically blink away if you are within [b]7.5 units[/b] of the boss.
 
 [b]Ichor Pursuit[/b]
 When the boss turns into ichor and pursues you, automatically blink away if you are within [b]4.5 units[/b] of the boss.

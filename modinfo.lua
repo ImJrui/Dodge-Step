@@ -11,7 +11,7 @@ end
 name = en_zh({ en = "Dodge Step", zh = "闪身步" })
 description = en_zh({
     en = "Client-only automatic dodging for Shrouden.\n\nPortal summons: if you are in front of the boss within the configured range (default: 12 units), blink behind it.\nOptic blast: after the boss teleports into position, blink away within the configured distance (default: 7 units).\nIchor pursuit: when the boss turns into a puddle, blink away within the configured distance (default: 4.5 units).\n\nEach skill's trigger distance can be configured, or its dodging disabled.\n\nWortox uses Soul Hop first; otherwise, use a Lazy Explorer or an orange-gem King's Staff. Avoids dangerous landing spots and restores your previous weapon after dodging.",
-    zh = "仅客户端，自动闪避暗影憎恶（Shrouden）的危险技能。\n\n传送门召唤：当你位于 Boss 前方的设定距离内（默认12）时，闪现到 Boss 身后。\n镭射激光：当 Boss 传送落位且进入设定距离（默认7）时，闪现远离 Boss。\n恶液追击：当 Boss 化身恶液并进入设定距离（默认4.5）时，闪现拉开距离。\n\n三种技能可分别设置闪避触发距离，也可选择不躲避。\n\n沃拓克优先使用灵魂跳跃，其他情况使用懒人手杖或镶嵌橙宝石的国王权杖。自动避开危险落点，闪避后恢复原武器。",
+    zh = "仅客户端，自动闪避暗影憎恶（Shrouden）的危险技能。\n\n传送门召唤：当你位于 Boss 前方的设定距离内（默认12）时，闪现到 Boss 身后。\n镭射激光：当 Boss 传送落位且进入设定距离（默认7.5）时，闪现远离 Boss。\n恶液追击：当 Boss 化身恶液并进入设定距离（默认4.5）时，闪现拉开距离。\n\n三种技能可分别设置闪避触发距离，也可选择不躲避。\n\n沃拓克优先使用灵魂跳跃，其他情况使用懒人手杖或镶嵌橙宝石的国王权杖。自动避开危险落点，闪避后恢复原武器。",
 })
 author = "好想好想吃兔兔"
 version = "0.2.2"
