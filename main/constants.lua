@@ -34,7 +34,7 @@ DS_CONFIG = {
     DEBUG_MODE = debug_mode,
     PORTAL_DISTANCE = get_distance("DS_PORTAL_DISTANCE", 10, 18, 1, 12),
     PUDDLE_DISTANCE = get_distance("DS_PUDDLE_DISTANCE", 4, 6, 0.5, 4.5),
-    LASER_DISTANCE = get_distance("DS_LASER_DISTANCE", 6, 8, 0.5, 7),
+    LASER_DISTANCE = get_distance("DS_LASER_DISTANCE", 6, 9, 0.5, 7.5),
 }
 
 DS_BOSS_REGISTRY = { shrouden = {} }

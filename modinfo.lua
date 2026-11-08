@@ -14,7 +14,7 @@ description = en_zh({
     zh = "仅客户端，自动闪避暗影憎恶（Shrouden）的危险技能。\n\n传送门召唤：当你位于 Boss 前方的设定距离内（默认12）时，闪现到 Boss 身后。\n镭射激光：当 Boss 传送落位且进入设定距离（默认7）时，闪现远离 Boss。\n恶液追击：当 Boss 化身恶液并进入设定距离（默认4.5）时，闪现拉开距离。\n\n三种技能可分别设置闪避触发距离，也可选择不躲避。\n\n沃拓克优先使用灵魂跳跃，其他情况使用懒人手杖或镶嵌橙宝石的国王权杖。自动避开危险落点，闪避后恢复原武器。",
 })
 author = "好想好想吃兔兔"
-version = "0.2.1"
+version = "0.2.2"
 api_version = 10
 dst_compatible = true
 client_only_mod = true
@@ -76,8 +76,10 @@ configuration_options = {
             { description = "7", data = 7 },
             { description = "7.5", data = 7.5 },
             { description = "8", data = 8 },
+            { description = "8.5", data = 8.5 },
+            { description = "9", data = 9 },
         },
-        default = 7,
+        default = 7.5,
     },
     {
         name = "DS_DEBUG_MODE",
